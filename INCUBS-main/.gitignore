@@ -1,0 +1,15 @@
+# Node
+node_modules/
+
+# Expo
+.expo/
+.expo-shared/
+
+# Ignore env files
+mobile/.env
+
+# Logs
+adb_log.txt
+
+# macOS
+.DS_Store
