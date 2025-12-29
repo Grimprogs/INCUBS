@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Incubes",
+    "slug": "incubes",
+    "version": "1.0.0",
+    "extra": {
+      "SUPABASE_URL": "<YOUR_SUPABASE_URL>",
+      "SUPABASE_ANON_KEY": "<YOUR_SUPABASE_ANON_KEY>",
+      "eas": {
+        "projectId": "822785f2-7d75-4ce8-99bd-24999fa5dfe0"
+      }
+    }
+  }
+}
