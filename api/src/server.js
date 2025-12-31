@@ -21,16 +21,25 @@ if (!process.env.DATABASE_URL) {
 
 async function createPool() {
   const parsed = new URL(process.env.DATABASE_URL);
-  const hostResolution = await dnsPromises.lookup(parsed.hostname, { family: 4 });
-
-  return new Pool({
-    user: decodeURIComponent(parsed.username),
-    password: decodeURIComponent(parsed.password),
-    host: hostResolution.address, // Force IPv4
-    port: Number(parsed.port || 5432),
-    database: parsed.pathname.replace('/', ''),
-    ssl: { rejectUnauthorized: false },
-  });
+  try {
+    const hostResolution = await dnsPromises.lookup(parsed.hostname, { family: 4 });
+    return new Pool({
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      host: hostResolution.address, // Force IPv4 when resolvable
+      port: Number(parsed.port || 5432),
+      database: parsed.pathname.replace('/', ''),
+      ssl: { rejectUnauthorized: false },
+    });
+  } catch (lookupErr) {
+    console.warn('DNS lookup failed, falling back to connectionString', lookupErr);
+    return new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      // Prefer IPv4 but allow default resolution if lookup fails here
+      lookup: (hostname, opts, cb) => dns.lookup(hostname, { ...opts, family: 4, hints: dns.ADDRCONFIG }, cb),
+    });
+  }
 }
 
 const poolPromise = createPool().catch((err) => {
