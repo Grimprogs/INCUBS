@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const dns = require('dns');
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
 
@@ -16,7 +17,12 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  // Force IPv4 because Render to Supabase over IPv6 can be unreachable.
+  lookup: (hostname, opts, cb) => dns.lookup(hostname, { ...opts, family: 4, hints: dns.ADDRCONFIG }, cb),
+});
 
 const app = express();
 app.use(helmet());
