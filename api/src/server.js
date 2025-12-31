@@ -23,6 +23,43 @@ app.use(helmet());
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json());
 
+// Gracefully handle bad JSON payloads early.
+app.use((err, _req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON body' });
+  }
+  next(err);
+});
+
+async function ensureSchema() {
+  // Create aadhaar_checks table and indexes if missing, and ensure users columns exist.
+  await runQuery(
+    `CREATE TABLE IF NOT EXISTS public.aadhaar_checks (
+      id uuid PRIMARY KEY,
+      aadhaar_number_encrypted text NOT NULL,
+      aadhaar_last4 text NOT NULL,
+      otp_txn_id text NOT NULL UNIQUE,
+      otp_verified boolean DEFAULT false,
+      otp_expires_at timestamptz NOT NULL,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    );`
+  );
+
+  await runQuery('CREATE INDEX IF NOT EXISTS idx_aadhaar_checks_txn ON public.aadhaar_checks (otp_txn_id);');
+  await runQuery('CREATE INDEX IF NOT EXISTS idx_aadhaar_checks_verified ON public.aadhaar_checks (otp_verified);');
+  await runQuery('CREATE INDEX IF NOT EXISTS idx_aadhaar_checks_last4 ON public.aadhaar_checks (aadhaar_last4);');
+
+  await runQuery('ALTER TABLE public.users ADD COLUMN IF NOT EXISTS aadhaar_check_id uuid REFERENCES public.aadhaar_checks(id);');
+  await runQuery('ALTER TABLE public.users ADD COLUMN IF NOT EXISTS aadhaar_verified boolean DEFAULT false;');
+  await runQuery('CREATE INDEX IF NOT EXISTS idx_users_aadhaar_verified ON public.users (aadhaar_verified);');
+}
+
+ensureSchema().catch((err) => {
+  console.error('Failed to ensure schema', err);
+  process.exit(1);
+});
+
 function maskAadhaar(aadhaarNumber) {
   return aadhaarNumber.replace(/.(?=.{4})/g, 'x');
 }
@@ -177,6 +214,14 @@ app.post('/signup', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// DigiLocker callback placeholder: integrate real exchange for auth code -> eKYC and mark Aadhaar verified.
+app.post('/digilocker/callback', async (req, res) => {
+  const { code, state } = req.body || {};
+  if (!code) return res.status(400).json({ error: 'code is required' });
+  // TODO: exchange code with DigiLocker, fetch eKYC, and map to aadhaar_checks.
+  return res.status(501).json({ error: 'DigiLocker integration not implemented yet' });
 });
 
 app.use((err, _req, res, _next) => {
