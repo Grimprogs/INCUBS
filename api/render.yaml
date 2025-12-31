@@ -1,0 +1,18 @@
+# Render manifest for automatic deploy. Do NOT include secrets here — set them in
+# the Render dashboard under Environment -> Environment Variables.
+
+services:
+  - type: web
+    name: incubs-aadhaar-backend
+    env: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install
+    startCommand: npm run start
+    autoDeploy: true
+    # The repository will be detected when you connect GitHub in Render.
+    # Set these environment variables in Render dashboard:
+    # - DATABASE_URL
+    # - ALLOWED_ORIGINS
+    # - TEST_OTP (optional)
