@@ -1,115 +1,120 @@
 import React, { useState } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, ActivityIndicator, 
-  ScrollView, KeyboardAvoidingView, Platform, StyleSheet 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { generateRecoveryKey, hashRecoveryKey } from '../../../mobile/utils/recovery.util';
-import { supabase } from '../../supabaseClient';
+
+const BACKEND_URL = process.env.BACKEND_URL || 'https://incubs.onrender.com';
 
 export default function SignupScreen({ navigation }: { navigation: any }) {
-  const { signUp } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [txnId, setTxnId] = useState<string | null>(null);
+  const [masked, setMasked] = useState<string | null>(null);
+  const [loadingSend, setLoadingSend] = useState(false);
+  const [loadingVerify, setLoadingVerify] = useState(false);
+  const [loadingSignup, setLoadingSignup] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [verified, setVerified] = useState(false);
 
-  async function onSignup() {
+  const resetMessages = () => {
+    setError('');
+    setSuccess('');
+  };
+
+  const validateAadhaar = (value: string) => /^[0-9]{12}$/.test(value.trim());
+
+  async function sendOtp() {
     try {
-      setError('');
-      setSuccess('');
-      setLoading(true);
-
-      if (!email || !password) {
-        setError('Please enter email and password');
+      resetMessages();
+      if (!validateAadhaar(aadhaarNumber)) {
+        setError('Aadhaar number must be 12 digits');
         return;
       }
-      if (password.length < 6) {
-        setError('Password must be at least 6 characters');
-        return;
-      }
-
-      // Store credentials temporarily for later sign-in
-      const signupEmail = email.trim();
-      const signupPassword = password;
-
-      // Generate recovery key
-      const newRecoveryKey = generateRecoveryKey();
-      const recoveryHash = hashRecoveryKey(newRecoveryKey);
-      
-      console.log('🔑 Recovery Key:', newRecoveryKey);
-      console.log('🔒 Recovery Hash:', recoveryHash);
-
-      // Sign up user with recovery hash in metadata
-      const { data: signUpData, error: signupError } = await signUp(
-        signupEmail, 
-        signupPassword,
-        {
-          data: {
-            recovery_key_hash: recoveryHash
-          }
-        }
-      );
-      
-      if (signupError) {
-        const errorMsg = signupError.message || signupError.status || String(signupError);
-        setError(`Signup failed: ${errorMsg}`);
-        console.error('Signup error details:', signupError);
-        return;
-      }
-
-      console.log('✅ User created with recovery hash:', signUpData?.user?.id);
-      console.log('📋 User metadata:', signUpData?.user?.user_metadata);
-      console.log('🔍 Recovery hash in metadata:', signUpData?.user?.user_metadata?.recovery_key_hash);
-
-      // Upsert into app users table so recovery flow can find the user
-      const appUserId = signUpData?.user?.id;
-      if (!appUserId) {
-        setError('Signup failed: missing user id after creation');
-        return;
-      }
-
-      const { error: upsertError } = await supabase
-        .from('users')
-        .upsert(
-          {
-            id: appUserId,
-            email: signupEmail,
-            recovery_key_hash: recoveryHash,
-          },
-          { onConflict: 'id' }
-        );
-
-      if (upsertError) {
-        console.error('User upsert error:', upsertError);
-        setError('Could not save user profile. Please try again.');
-        return;
-      }
-
-      setSuccess('Account created successfully!');
-      setLoading(false);
-
-      // Navigate to dedicated recovery key page before signing in.
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'RecoveryKey',
-            params: {
-              recoveryKey: newRecoveryKey,
-              email: signupEmail,
-              password: signupPassword,
-            },
-          },
-        ],
+      setLoadingSend(true);
+      const res = await fetch(`${BACKEND_URL}/aadhaar/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aadhaar_number: aadhaarNumber.trim() }),
       });
-
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error || 'Failed to send OTP');
+        return;
+      }
+      setTxnId(json.txn_id);
+      setMasked(json.masked || null);
+      setSuccess('OTP sent. Use TEST_OTP=123456 in this build.');
+      setVerified(false);
     } catch (err) {
-      setError(`Unexpected error: ${String(err)}`);
-      console.error('Signup exception:', err);
+      setError(`Failed to send OTP: ${String(err)}`);
     } finally {
-      setLoading(false);
+      setLoadingSend(false);
+    }
+  }
+
+  async function verifyOtp() {
+    try {
+      resetMessages();
+      if (!txnId) {
+        setError('Send OTP first');
+        return;
+      }
+      if (!otp.trim()) {
+        setError('Enter the OTP');
+        return;
+      }
+      setLoadingVerify(true);
+      const res = await fetch(`${BACKEND_URL}/aadhaar/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aadhaar_number: aadhaarNumber.trim(), otp: otp.trim(), txn_id: txnId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error || 'Failed to verify OTP');
+        return;
+      }
+      setVerified(true);
+      setSuccess('Aadhaar verified. Complete signup to finish.');
+    } catch (err) {
+      setError(`Failed to verify OTP: ${String(err)}`);
+    } finally {
+      setLoadingVerify(false);
+    }
+  }
+
+  async function completeSignup() {
+    try {
+      resetMessages();
+      if (!txnId || !verified) {
+        setError('Verify Aadhaar before signup');
+        return;
+      }
+      setLoadingSignup(true);
+      const res = await fetch(`${BACKEND_URL}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aadhaar_number: aadhaarNumber.trim(), txn_id: txnId, profile: { source: 'mobile' } }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error || 'Signup failed');
+        return;
+      }
+      setSuccess('Signup complete!');
+    } catch (err) {
+      setError(`Signup failed: ${String(err)}`);
+    } finally {
+      setLoadingSignup(false);
     }
   }
 
@@ -142,55 +147,69 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput 
-                value={email} 
-                onChangeText={setEmail} 
-                autoCapitalize="none" 
-                keyboardType="email-address" 
-                placeholder="you@example.com"
+              <Text style={styles.label}>Aadhaar Number</Text>
+              <TextInput
+                value={aadhaarNumber}
+                onChangeText={setAadhaarNumber}
+                keyboardType="number-pad"
+                placeholder="12-digit Aadhaar"
+                maxLength={12}
                 placeholderTextColor="#9CA3AF"
-                editable={!loading}
-                style={[styles.input, error && !success ? styles.inputError : null]} 
+                editable={!loadingSend && !loadingVerify && !loadingSignup && !verified}
+                style={[styles.input, error && !success ? styles.inputError : null]}
               />
+              {masked ? <Text style={styles.hint}>Session: {masked}</Text> : null}
+            </View>
+
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton, loadingSend && styles.buttonDisabled]}
+                onPress={sendOtp}
+                disabled={loadingSend || loadingVerify || loadingSignup}
+                activeOpacity={0.8}
+              >
+                {loadingSend ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Send OTP</Text>}
+              </TouchableOpacity>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput 
-                value={password} 
-                onChangeText={setPassword} 
-                secureTextEntry 
-                placeholder="••••••••"
+              <Text style={styles.label}>OTP</Text>
+              <TextInput
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                placeholder="Enter OTP"
                 placeholderTextColor="#9CA3AF"
-                editable={!loading}
-                style={[styles.input, error && !success ? styles.inputError : null]} 
+                editable={!!txnId && !loadingVerify && !loadingSignup}
+                style={[styles.input, error && !success ? styles.inputError : null]}
               />
-              <Text style={styles.hint}>Must be at least 6 characters</Text>
+              <Text style={styles.hint}>Use 123456 in this test build</Text>
             </View>
 
-            <TouchableOpacity 
-              style={[styles.button, loading && styles.buttonDisabled]} 
-              onPress={onSignup} 
-              disabled={loading}
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={[styles.button, loadingVerify && styles.buttonDisabled]}
+                onPress={verifyOtp}
+                disabled={!txnId || loadingVerify || loadingSignup}
+                activeOpacity={0.8}
+              >
+                {loadingVerify ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Verify OTP</Text>}
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, loadingSignup && styles.buttonDisabled, !verified && styles.buttonDisabled]}
+              onPress={completeSignup}
+              disabled={!verified || loadingSignup}
               activeOpacity={0.8}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.buttonText}>Create Account</Text>
-              )}
+              {loadingSignup ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Complete Signup</Text>}
             </TouchableOpacity>
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account?</Text>
-            <TouchableOpacity 
-              onPress={() => navigation.navigate('Login')}
-              disabled={loading}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.linkText}>Log in</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loadingSend || loadingVerify || loadingSignup} activeOpacity={0.7}>
+              <Text style={styles.linkText}>Back to Login</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -295,6 +314,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  secondaryButton: {
+    backgroundColor: '#1F2937',
+    shadowColor: '#1F2937',
+  },
   buttonDisabled: {
     backgroundColor: '#93C5FD',
     shadowOpacity: 0,
@@ -304,6 +327,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
   },
   footer: {
     flexDirection: 'row',
