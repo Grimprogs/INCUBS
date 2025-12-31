@@ -10,10 +10,14 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'https://incubs.onrender.com';
 
 export default function SignupScreen({ navigation }: { navigation: any }) {
+  const { signUp } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [txnId, setTxnId] = useState<string | null>(null);
@@ -31,6 +35,7 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
   };
 
   const validateAadhaar = (value: string) => /^[0-9]{12}$/.test(value.trim());
+  const validateEmail = (value: string) => /.+@.+\..+/.test(value.trim());
 
   async function sendOtp() {
     try {
@@ -99,11 +104,35 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
         setError('Verify Aadhaar before signup');
         return;
       }
+      if (!validateEmail(email)) {
+        setError('Enter a valid email');
+        return;
+      }
+      if (password.trim().length < 6) {
+        setError('Password must be at least 6 characters');
+        return;
+      }
       setLoadingSignup(true);
+
+      const signupEmail = email.trim();
+      const signupPassword = password.trim();
+
+      const { error: authError } = await signUp(signupEmail, signupPassword, {
+        data: { signup_via: 'aadhaar' },
+      });
+      if (authError) {
+        setError(authError.message || 'Auth signup failed');
+        return;
+      }
+
       const res = await fetch(`${BACKEND_URL}/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aadhaar_number: aadhaarNumber.trim(), txn_id: txnId, profile: { source: 'mobile' } }),
+        body: JSON.stringify({
+          aadhaar_number: aadhaarNumber.trim(),
+          txn_id: txnId,
+          profile: { source: 'mobile', email: signupEmail },
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -146,6 +175,34 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
           ) : null}
 
           <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholder="you@example.com"
+                placeholderTextColor="#9CA3AF"
+                editable={!loadingSend && !loadingVerify && !loadingSignup}
+                style={[styles.input, error && !success ? styles.inputError : null]}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholder="••••••••"
+                placeholderTextColor="#9CA3AF"
+                editable={!loadingSend && !loadingVerify && !loadingSignup}
+                style={[styles.input, error && !success ? styles.inputError : null]}
+              />
+              <Text style={styles.hint}>At least 6 characters</Text>
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Aadhaar Number</Text>
               <TextInput
