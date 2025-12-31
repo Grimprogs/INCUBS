@@ -13,6 +13,8 @@ dist/
 # Env and secrets
 .env
 .env.local
+supabase.env.js
+supabase*.js
 
 # Logs and caches
 npm-debug.log*
