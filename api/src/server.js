@@ -19,14 +19,23 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+async function resolveIPv4(hostname) {
+  if (process.env.DB_HOSTADDR) {
+    return process.env.DB_HOSTADDR.trim();
+  }
+  const result = await dnsPromises.resolve4(hostname);
+  if (!result || !result.length) throw new Error('No A records found');
+  return result[0];
+}
+
 async function createPool() {
   const parsed = new URL(process.env.DATABASE_URL);
   try {
-    const hostResolution = await dnsPromises.lookup(parsed.hostname, { family: 4 });
+    const hostaddr = await resolveIPv4(parsed.hostname);
     return new Pool({
       user: decodeURIComponent(parsed.username),
       password: decodeURIComponent(parsed.password),
-      host: hostResolution.address, // Force IPv4 when resolvable
+      host: hostaddr, // Force IPv4 when resolvable
       port: Number(parsed.port || 5432),
       database: parsed.pathname.replace('/', ''),
       ssl: { rejectUnauthorized: false },
