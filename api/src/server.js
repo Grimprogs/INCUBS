@@ -3,7 +3,9 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const dns = require('dns');
+const { promises: dnsPromises } = dns;
 const { Pool } = require('pg');
+const { URL } = require('url');
 const { v4: uuidv4 } = require('uuid');
 
 const PORT = process.env.PORT || 4000;
@@ -17,11 +19,23 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  // Force IPv4 because Render to Supabase over IPv6 can be unreachable.
-  lookup: (hostname, opts, cb) => dns.lookup(hostname, { ...opts, family: 4, hints: dns.ADDRCONFIG }, cb),
+async function createPool() {
+  const parsed = new URL(process.env.DATABASE_URL);
+  const hostResolution = await dnsPromises.lookup(parsed.hostname, { family: 4 });
+
+  return new Pool({
+    user: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    host: hostResolution.address, // Force IPv4
+    port: Number(parsed.port || 5432),
+    database: parsed.pathname.replace('/', ''),
+    ssl: { rejectUnauthorized: false },
+  });
+}
+
+const poolPromise = createPool().catch((err) => {
+  console.error('Failed to init DB pool', err);
+  process.exit(1);
 });
 
 const app = express();
@@ -75,6 +89,7 @@ function addMinutes(date, minutes) {
 }
 
 async function runQuery(text, params) {
+  const pool = await poolPromise;
   const result = await pool.query(text, params);
   return result;
 }
