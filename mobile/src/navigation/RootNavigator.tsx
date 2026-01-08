@@ -30,7 +30,6 @@ import RoleSelectionScreen from '../screens/RoleSelectionScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
-import RecoveryKeyScreen from '../screens/RecoveryKeyScreen';
 import { supabase } from '../../supabaseClient';
 
 // Define the type for stack routes, including admin screens.
@@ -38,7 +37,7 @@ type RootStackParamList = {
   RoleSelection: undefined;
   Login: undefined;
   Signup: undefined;
-  RecoveryKey: { recoveryKey: string; email: string; password: string };
+  /* RecoveryKey removed from navigator to keep recovery UI hidden unless explicitly used */
   // EmailConfirmation removed
   ForgotPassword: undefined;
   StartupHome: undefined;
@@ -118,11 +117,11 @@ export default function RootNavigator() {
     );
   }
 
-  // If authenticated but role is not chosen yet, show role selection.
+  // If authenticated but role is not chosen yet, don't force the RoleSelection flow.
+  // Show Settings so the user can change role manually when needed.
   if (user.role === null) {
     return (
-      <Stack.Navigator id="RootNavigator" initialRouteName="RoleSelection">
-        <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ headerShown: false }} />
+      <Stack.Navigator id="RootNavigator" initialRouteName="Settings">
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     );

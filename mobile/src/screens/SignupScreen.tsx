@@ -4,7 +4,6 @@ import {
   ScrollView, KeyboardAvoidingView, Platform, StyleSheet 
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { generateRecoveryKey, hashRecoveryKey } from '../../../mobile/utils/recovery.util';
 import { supabase } from '../../supabaseClient';
 
 export default function SignupScreen({ navigation }: { navigation: any }) {
@@ -34,23 +33,8 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
       const signupEmail = email.trim();
       const signupPassword = password;
 
-      // Generate recovery key
-      const newRecoveryKey = generateRecoveryKey();
-      const recoveryHash = hashRecoveryKey(newRecoveryKey);
-      
-      console.log('🔑 Recovery Key:', newRecoveryKey);
-      console.log('🔒 Recovery Hash:', recoveryHash);
-
-      // Sign up user with recovery hash in metadata
-      const { data: signUpData, error: signupError } = await signUp(
-        signupEmail, 
-        signupPassword,
-        {
-          data: {
-            recovery_key_hash: recoveryHash
-          }
-        }
-      );
+      // Sign up user (no recovery key flow on frontend)
+      const { data: signUpData, error: signupError } = await signUp(signupEmail, signupPassword);
       
       if (signupError) {
         const errorMsg = signupError.message || signupError.status || String(signupError);
@@ -63,47 +47,9 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
       console.log('📋 User metadata:', signUpData?.user?.user_metadata);
       console.log('🔍 Recovery hash in metadata:', signUpData?.user?.user_metadata?.recovery_key_hash);
 
-      // Upsert into app users table so recovery flow can find the user
-      const appUserId = signUpData?.user?.id;
-      if (!appUserId) {
-        setError('Signup failed: missing user id after creation');
-        return;
-      }
-
-      const { error: upsertError } = await supabase
-        .from('users')
-        .upsert(
-          {
-            id: appUserId,
-            email: signupEmail,
-            recovery_key_hash: recoveryHash,
-          },
-          { onConflict: 'id' }
-        );
-
-      if (upsertError) {
-        console.error('User upsert error:', upsertError);
-        setError('Could not save user profile. Please try again.');
-        return;
-      }
-
-      setSuccess('Account created successfully!');
+      setSuccess('Account created successfully! Please log in.');
       setLoading(false);
-
-      // Navigate to dedicated recovery key page before signing in.
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'RecoveryKey',
-            params: {
-              recoveryKey: newRecoveryKey,
-              email: signupEmail,
-              password: signupPassword,
-            },
-          },
-        ],
-      });
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
 
     } catch (err) {
       setError(`Unexpected error: ${String(err)}`);
