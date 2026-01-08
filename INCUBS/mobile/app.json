@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Incubes",
+    "slug": "incubes",
+    "version": "1.0.0",
+    "scheme": "incubs",
+    "extra": {
+      "eas": {
+        "projectId": "822785f2-7d75-4ce8-99bd-24999fa5dfe0"
+      }
+    }
+  }
+}
