@@ -145,6 +145,56 @@ app.post('/aadhaar/verify-otp', async (req, res, next) => {
   }
 });
 
+// DigiLocker callback placeholder: accepts auth code and txn_id, simulates eKYC fetch.
+app.post('/digilocker/callback', async (req, res) => {
+  try {
+    const { code, txn_id } = req.body || {};
+    if (!code || !txn_id) return res.status(400).json({ error: 'code and txn_id are required' });
+
+    const { data: check, error: checkError } = await supabase
+      .from('aadhaar_checks')
+      .select('*')
+      .eq('otp_txn_id', txn_id)
+      .limit(1)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Failed to fetch aadhaar_check for digilocker', checkError);
+      return res.status(500).json({ error: 'Failed to fetch Aadhaar session' });
+    }
+    if (!check) return res.status(404).json({ error: 'Aadhaar session not found' });
+
+    // Simulated eKYC payload — replace with real DigiLocker exchange.
+    const kycPhone = '9999999999';
+    const kycEmail = 'digilocker@example.com';
+    const kycName = 'DigiLocker User';
+
+    const { error: updateError } = await supabase
+      .from('aadhaar_checks')
+      .update({
+        kyc_verified: true,
+        kyc_provider: 'digilocker',
+        kyc_ref: code,
+        phone: kycPhone,
+        email: kycEmail,
+        name: kycName,
+        consent_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('otp_txn_id', txn_id);
+
+    if (updateError) {
+      console.error('Failed to update kyc info', updateError);
+      return res.status(500).json({ error: 'Failed to store KYC info' });
+    }
+
+    return res.json({ success: true, phone: kycPhone, email: kycEmail, name: kycName });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/signup', async (req, res, next) => {
   try {
     const { txn_id, aadhaar_number, profile } = req.body || {};
@@ -167,7 +217,7 @@ app.post('/signup', async (req, res, next) => {
       return res.status(404).json({ error: 'Aadhaar session not found' });
     }
 
-    if (!check.otp_verified) {
+    if (!check.otp_verified && !check.kyc_verified) {
       return res.status(403).json({ error: 'Aadhaar not verified' });
     }
 
@@ -184,6 +234,9 @@ app.post('/signup', async (req, res, next) => {
       id: userId,
       aadhaar_check_id: check.id,
       aadhaar_verified: true,
+      phone: check.phone || null,
+      email: (profile && profile.email) || check.email || null,
+      name: check.name || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -196,14 +249,6 @@ app.post('/signup', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
-
-// DigiLocker callback placeholder: integrate real exchange for auth code -> eKYC and mark Aadhaar verified.
-app.post('/digilocker/callback', async (req, res) => {
-  const { code, state } = req.body || {};
-  if (!code) return res.status(400).json({ error: 'code is required' });
-  // TODO: exchange code with DigiLocker, fetch eKYC, and map to aadhaar_checks.
-  return res.status(501).json({ error: 'DigiLocker integration not implemented yet' });
 });
 
 app.use((err, _req, res, _next) => {

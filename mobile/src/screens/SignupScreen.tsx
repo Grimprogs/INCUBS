@@ -18,92 +18,20 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
   const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [aadhaarNumber, setAadhaarNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [txnId, setTxnId] = useState<string | null>(null);
-  const [masked, setMasked] = useState<string | null>(null);
-  const [loadingSend, setLoadingSend] = useState(false);
-  const [loadingVerify, setLoadingVerify] = useState(false);
   const [loadingSignup, setLoadingSignup] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [verified, setVerified] = useState(false);
 
   const resetMessages = () => {
     setError('');
     setSuccess('');
   };
-
-  const validateAadhaar = (value: string) => /^[0-9]{12}$/.test(value.trim());
   const validateEmail = (value: string) => /.+@.+\..+/.test(value.trim());
 
-  async function sendOtp() {
-    try {
-      resetMessages();
-      if (!validateAadhaar(aadhaarNumber)) {
-        setError('Aadhaar number must be 12 digits');
-        return;
-      }
-      setLoadingSend(true);
-      const res = await fetch(`${BACKEND_URL}/aadhaar/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aadhaar_number: aadhaarNumber.trim() }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json?.error || 'Failed to send OTP');
-        return;
-      }
-      setTxnId(json.txn_id);
-      setMasked(json.masked || null);
-      setSuccess('OTP sent. Use TEST_OTP=123456 in this build.');
-      setVerified(false);
-    } catch (err) {
-      setError(`Failed to send OTP: ${String(err)}`);
-    } finally {
-      setLoadingSend(false);
-    }
-  }
-
-  async function verifyOtp() {
-    try {
-      resetMessages();
-      if (!txnId) {
-        setError('Send OTP first');
-        return;
-      }
-      if (!otp.trim()) {
-        setError('Enter the OTP');
-        return;
-      }
-      setLoadingVerify(true);
-      const res = await fetch(`${BACKEND_URL}/aadhaar/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aadhaar_number: aadhaarNumber.trim(), otp: otp.trim(), txn_id: txnId }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json?.error || 'Failed to verify OTP');
-        return;
-      }
-      setVerified(true);
-      setSuccess('Aadhaar verified. Complete signup to finish.');
-    } catch (err) {
-      setError(`Failed to verify OTP: ${String(err)}`);
-    } finally {
-      setLoadingVerify(false);
-    }
-  }
 
   async function completeSignup() {
     try {
       resetMessages();
-      if (!txnId || !verified) {
-        setError('Verify Aadhaar before signup');
-        return;
-      }
       if (!validateEmail(email)) {
         setError('Enter a valid email');
         return;
@@ -118,7 +46,7 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
       const signupPassword = password.trim();
 
       const { error: authError } = await signUp(signupEmail, signupPassword, {
-        data: { signup_via: 'aadhaar' },
+        data: { signup_via: 'email' },
       });
       if (authError) {
         setError(authError.message || 'Auth signup failed');
@@ -129,8 +57,6 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          aadhaar_number: aadhaarNumber.trim(),
-          txn_id: txnId,
           profile: { source: 'mobile', email: signupEmail },
         }),
       });
@@ -184,7 +110,7 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
                 keyboardType="email-address"
                 placeholder="you@example.com"
                 placeholderTextColor="#9CA3AF"
-                editable={!loadingSend && !loadingVerify && !loadingSignup}
+                editable={!loadingSignup}
                 style={[styles.input, error && !success ? styles.inputError : null]}
               />
             </View>
@@ -197,67 +123,18 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
                 secureTextEntry
                 placeholder="••••••••"
                 placeholderTextColor="#9CA3AF"
-                editable={!loadingSend && !loadingVerify && !loadingSignup}
+                editable={!loadingSignup}
                 style={[styles.input, error && !success ? styles.inputError : null]}
               />
               <Text style={styles.hint}>At least 6 characters</Text>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Aadhaar Number</Text>
-              <TextInput
-                value={aadhaarNumber}
-                onChangeText={setAadhaarNumber}
-                keyboardType="number-pad"
-                placeholder="12-digit Aadhaar"
-                maxLength={12}
-                placeholderTextColor="#9CA3AF"
-                editable={!loadingSend && !loadingVerify && !loadingSignup && !verified}
-                style={[styles.input, error && !success ? styles.inputError : null]}
-              />
-              {masked ? <Text style={styles.hint}>Session: {masked}</Text> : null}
-            </View>
-
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton, loadingSend && styles.buttonDisabled]}
-                onPress={sendOtp}
-                disabled={loadingSend || loadingVerify || loadingSignup}
-                activeOpacity={0.8}
-              >
-                {loadingSend ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Send OTP</Text>}
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>OTP</Text>
-              <TextInput
-                value={otp}
-                onChangeText={setOtp}
-                keyboardType="number-pad"
-                placeholder="Enter OTP"
-                placeholderTextColor="#9CA3AF"
-                editable={!!txnId && !loadingVerify && !loadingSignup}
-                style={[styles.input, error && !success ? styles.inputError : null]}
-              />
-              <Text style={styles.hint}>Use 123456 in this test build</Text>
-            </View>
-
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.button, loadingVerify && styles.buttonDisabled]}
-                onPress={verifyOtp}
-                disabled={!txnId || loadingVerify || loadingSignup}
-                activeOpacity={0.8}
-              >
-                {loadingVerify ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Verify OTP</Text>}
-              </TouchableOpacity>
-            </View>
+            {/* Aadhaar/OTP/KYC removed from UI per request. Signup is email/password only in the app. */}
 
             <TouchableOpacity
-              style={[styles.button, loadingSignup && styles.buttonDisabled, !verified && styles.buttonDisabled]}
+              style={[styles.button, loadingSignup && styles.buttonDisabled]}
               onPress={completeSignup}
-              disabled={!verified || loadingSignup}
+              disabled={loadingSignup}
               activeOpacity={0.8}
             >
               {loadingSignup ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Complete Signup</Text>}
@@ -265,7 +142,7 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
           </View>
 
           <View style={styles.footer}>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loadingSend || loadingVerify || loadingSignup} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loadingSignup} activeOpacity={0.7}>
               <Text style={styles.linkText}>Back to Login</Text>
             </TouchableOpacity>
           </View>
@@ -389,6 +266,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 12,
+  },
+  kycBox: {
+    backgroundColor: '#E5E7EB',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
   },
   footer: {
     flexDirection: 'row',
