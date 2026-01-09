@@ -37,7 +37,10 @@ export default function FundraisingCampaignDetail() {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { campaignId } = route.params as { campaignId: string };
+  const params = route.params as any;
+  const campaignId = params?.campaignId as string | undefined;
+  const isMock = params?.isMock === true;
+  const mockCampaign = params?.mockCampaign;
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,8 +50,54 @@ export default function FundraisingCampaignDetail() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (isMock && mockCampaign) {
+      // Map mock campaign shape to the expected DB campaign shape
+      const parsedGoal = parseCurrency(mockCampaign.fundingGoal);
+      const parsedRaised = parseCurrency(mockCampaign.currentRaised);
+
+      const mapped: any = {
+        id: mockCampaign.id,
+        title: mockCampaign.title,
+        description: mockCampaign.description,
+        funding_goal: parsedGoal,
+        funding_raised: parsedRaised,
+        equity_offered: 0,
+        campaign_type: mockCampaign.stage || 'seed',
+        min_investment: 0,
+        max_investment: null,
+        business_model: '',
+        market_size: '',
+        competitive_advantage: '',
+        use_of_funds: '',
+        pitch_deck_url: null,
+        financial_projections_url: null,
+        business_plan_url: null,
+        created_at: mockCampaign.createdAt,
+        startups: {
+          company_name: mockCampaign.startupName,
+          industry: mockCampaign.industry,
+          location: 'N/A',
+          founded_year: 0,
+          team_size: 0,
+        }
+      };
+
+      setCampaign(mapped as Campaign);
+      setLoading(false);
+      return;
+    }
+
     loadCampaign();
-  }, [campaignId]);
+  }, [campaignId, isMock, mockCampaign]);
+
+  function parseCurrency(str: string) {
+    if (!str) return 0;
+    const s = String(str).trim();
+    const num = parseFloat(s.replace(/[^0-9\.KMkm]/g, '')) || 0;
+    if (/K/i.test(s)) return Math.round(num * 1000);
+    if (/M/i.test(s)) return Math.round(num * 1000000);
+    return Math.round(num);
+  }
 
   const loadCampaign = async () => {
     try {
@@ -56,15 +105,7 @@ export default function FundraisingCampaignDetail() {
         .from('fundraising_campaigns')
         .select(`
           *,
-          startups (
-            company_name,
-            industry,
-            location,
-            founded_year,
-            team_size,
-            website,
-            linkedin
-          )
+          startups (*)
         `)
         .eq('id', campaignId)
         .single();
@@ -176,7 +217,7 @@ export default function FundraisingCampaignDetail() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.companyInfo}>
-          <Text style={styles.companyName}>{campaign.startups.company_name}</Text>
+          <Text style={styles.companyName}>{campaign.startups?.company_name}</Text>
           <Text style={styles.campaignTitle}>{campaign.title}</Text>
           <View style={styles.campaignType}>
             <Text style={styles.typeText}>{campaign.campaign_type.toUpperCase()}</Text>
@@ -231,30 +272,30 @@ export default function FundraisingCampaignDetail() {
         <View style={styles.companyDetails}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Industry:</Text>
-            <Text style={styles.detailValue}>{campaign.startups.industry}</Text>
+            <Text style={styles.detailValue}>{campaign.startups?.industry}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Location:</Text>
-            <Text style={styles.detailValue}>{campaign.startups.location}</Text>
+            <Text style={styles.detailValue}>{campaign.startups?.location}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Founded:</Text>
-            <Text style={styles.detailValue}>{campaign.startups.founded_year}</Text>
+            <Text style={styles.detailValue}>{campaign.startups?.founded_year}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Team Size:</Text>
-            <Text style={styles.detailValue}>{campaign.startups.team_size} members</Text>
+            <Text style={styles.detailValue}>{campaign.startups?.team_size} members</Text>
           </View>
-          {campaign.startups.website && (
+          {campaign.startups?.website && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Website:</Text>
-              <Text style={styles.detailValue}>{campaign.startups.website}</Text>
+              <Text style={styles.detailValue}>{campaign.startups?.website}</Text>
             </View>
           )}
-          {campaign.startups.linkedin && (
+          {(campaign.startups?.linkedin) && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>LinkedIn:</Text>
-              <Text style={styles.detailValue}>{campaign.startups.linkedin}</Text>
+              <Text style={styles.detailValue}>{campaign.startups?.linkedin}</Text>
             </View>
           )}
         </View>

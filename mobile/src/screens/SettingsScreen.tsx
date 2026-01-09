@@ -6,22 +6,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   const { setRole } = useAuth();
 
   function handleChangeRole() {
-    Alert.alert(
-      'Change role?',
-      'Changing your role will remove existing role-specific data. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Yes, change role',
-          style: 'destructive',
-          onPress: async () => {
-            await setRole(null);
-            navigation.reset({ index: 0, routes: [{ name: 'RoleSelection' }] });
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    // Navigate to RoleSelection so the user can choose when they want to change role.
+    navigation.navigate('RoleSelection');
   }
 
   return (

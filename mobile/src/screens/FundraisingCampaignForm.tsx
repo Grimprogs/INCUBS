@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../../supabaseClient';
 
 export default function FundraisingCampaignForm() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const params = route.params as any;
+  const editingCampaignId = params?.campaignId as string | undefined;
   const { user } = useAuth();
 
   const [title, setTitle] = useState('');
@@ -53,7 +56,33 @@ export default function FundraisingCampaignForm() {
         throw new Error('No startup profile found. Please create a startup profile first.');
       }
 
-      const { error } = await supabase.from('fundraising_campaigns').insert({
+      if (editingCampaignId) {
+        const { error } = await supabase.from('fundraising_campaigns').update({
+          title,
+          description,
+          funding_goal: parseFloat(fundingGoal),
+          min_investment: parseFloat(minInvestment) || 10000,
+          max_investment: maxInvestment ? parseFloat(maxInvestment) : null,
+          equity_offered: parseFloat(equityOffered),
+          campaign_type: campaignType,
+          start_date: startDate || null,
+          end_date: endDate || null,
+          pitch_deck_url: pitchDeckUrl,
+          business_plan_url: businessPlanUrl,
+          team_info: teamInfo,
+          market_analysis: marketAnalysis,
+          competitive_advantage: competitiveAdvantage,
+          use_of_funds: useOfFunds,
+          milestones: milestones,
+          risks: risks,
+        }).eq('id', editingCampaignId);
+
+        if (error) throw error;
+
+        Alert.alert('Success', 'Fundraising campaign updated successfully!');
+        navigation.goBack();
+      } else {
+        const { error } = await supabase.from('fundraising_campaigns').insert({
         startup_id: startupData.id,
         title,
         description,
@@ -74,11 +103,11 @@ export default function FundraisingCampaignForm() {
         risks: risks,
         status: 'draft'
       });
+        if (error) throw error;
 
-      if (error) throw error;
-
-      Alert.alert('Success', 'Fundraising campaign created successfully!');
-      navigation.goBack();
+        Alert.alert('Success', 'Fundraising campaign created successfully!');
+        navigation.goBack();
+      }
     } catch (error) {
       console.error('Error creating campaign:', error);
       Alert.alert('Error', error.message || 'Failed to create fundraising campaign');
@@ -86,6 +115,43 @@ export default function FundraisingCampaignForm() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    async function loadForEdit() {
+      if (!editingCampaignId) return;
+      try {
+        const { data, error } = await supabase
+          .from('fundraising_campaigns')
+          .select('*')
+          .eq('id', editingCampaignId)
+          .single();
+
+        if (error || !data) return;
+
+        setTitle(data.title || '');
+        setDescription(data.description || '');
+        setFundingGoal(String(data.funding_goal || ''));
+        setMinInvestment(String(data.min_investment || '10000'));
+        setMaxInvestment(data.max_investment ? String(data.max_investment) : '');
+        setEquityOffered(String(data.equity_offered || ''));
+        setCampaignType(data.campaign_type || 'equity');
+        setStartDate(data.start_date || '');
+        setEndDate(data.end_date || '');
+        setPitchDeckUrl(data.pitch_deck_url || '');
+        setBusinessPlanUrl(data.business_plan_url || '');
+        setTeamInfo(data.team_info || '');
+        setMarketAnalysis(data.market_analysis || '');
+        setCompetitiveAdvantage(data.competitive_advantage || '');
+        setUseOfFunds(data.use_of_funds || '');
+        setMilestones(data.milestones || '');
+        setRisks(data.risks || '');
+      } catch (err) {
+        console.error('Error loading campaign for edit:', err);
+      }
+    }
+
+    loadForEdit();
+  }, [editingCampaignId]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

@@ -129,7 +129,9 @@ export default function InvestorProfileForm() {
   }
 
   function onBack() {
-    setRole(null);
+    // navigate to explicit RoleSelection screen instead of clearing role
+    // @ts-ignore
+    navigation.navigate('RoleSelection');
   }
 
   return (

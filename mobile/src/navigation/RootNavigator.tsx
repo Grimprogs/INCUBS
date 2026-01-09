@@ -113,6 +113,7 @@ export default function RootNavigator() {
         <Stack.Screen name="Signup" component={SignupScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     );
   }
@@ -123,6 +124,7 @@ export default function RootNavigator() {
     return (
       <Stack.Navigator id="RootNavigator" initialRouteName="Settings">
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     );
   }
@@ -152,6 +154,7 @@ export default function RootNavigator() {
             options={{ headerShown: false }}
           />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ headerShown: false }} />
           <Stack.Screen 
             name="StartupHome" 
             component={StartupHome}
@@ -178,12 +181,14 @@ export default function RootNavigator() {
           options={{ title: '🏠 Home' }}
         />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ headerShown: false }} />
         <Stack.Screen 
           name="StartupProfileForm" 
           component={StartupProfileForm}
           options={{ title: '👤 Profile' }}
         />
         <Stack.Screen name="StartupDashboard" component={StartupDashboard} />
+          <Stack.Screen name="FundraisingCampaignDetail" component={FundraisingCampaignDetail} />
         <Stack.Screen 
           name="InvestorDetail" 
           component={InvestorDetail}
@@ -245,6 +250,7 @@ export default function RootNavigator() {
           options={{ title: '🏠 Home' }}
         />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ headerShown: false }} />
         <Stack.Screen 
           name="InvestorProfileForm" 
           component={InvestorProfileForm}

@@ -3,7 +3,7 @@ import { View, Text, TextInput, Switch, TouchableOpacity, Alert, ScrollView, Sty
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../../supabaseClient';
-import RoleSelectionScreen from '../src/screens/RoleSelectionScreen';
+// Navigate back to RoleSelection when user cancels profile completion
 
 export default function StartupProfileForm() {
   const navigation = useNavigation();
@@ -175,7 +175,9 @@ export default function StartupProfileForm() {
   }
 
 function onBack() {
-  setRole(null);
+  // navigate to explicit RoleSelection screen instead of clearing role
+  // @ts-ignore
+  navigation.navigate('RoleSelection');
 }
   return (
     <View style={styles.container}>

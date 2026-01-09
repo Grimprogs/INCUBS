@@ -200,6 +200,12 @@ export default function FundraisingDashboard() {
                 >
                   <Text style={styles.actionButtonText}>View Details</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => (navigation as any).navigate('FundraisingCampaignForm', { campaignId: campaign.id })}
+                >
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ))}
@@ -372,6 +378,9 @@ const styles = StyleSheet.create({
   },
   viewButton: {
     backgroundColor: '#007bff',
+  },
+  editButton: {
+    backgroundColor: '#6f42c1',
   },
   actionButtonText: {
     color: '#fff',

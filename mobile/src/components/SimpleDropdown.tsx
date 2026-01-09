@@ -1,7 +1,7 @@
 // Import React and hooks.
-import React, { useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 // Import basic UI components from React Native.
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, ScrollView, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, Pressable } from 'react-native';
 
 // Define the props for the dropdown component.
 type Props = {
@@ -15,26 +15,74 @@ type Props = {
 
 // SimpleDropdown is a minimal dropdown that cycles options on press.
 export default function SimpleDropdown({ options, value, onChange }: Props) {
-  // Track the index locally only for UI convenience.
+  const scrollRef = useRef<ScrollView | null>(null);
+  const ITEM_WIDTH = 120; // visual width of the option
+  const ITEM_MARGIN = 6; // horizontal margin applied in styles.option
+  const H_PADDING = 8; // contentContainerStyle horizontal padding
+  const SLOT = ITEM_WIDTH + ITEM_MARGIN * 2; // actual snapping slot width
+
   const currentIndex = Math.max(0, options.indexOf(value));
 
-  // Handler called when user presses the dropdown.
-  function handlePress() {
-    // Compute next index by wrapping around.
-    const nextIndex = (currentIndex + 1) % options.length;
-    // Call onChange with the new value.
-    onChange(options[nextIndex]);
-  }
+  useEffect(() => {
+    // Scroll to current index when value changes using the full slot width
+    if (scrollRef.current) {
+      const x = Math.max(0, currentIndex * SLOT - H_PADDING);
+      scrollRef.current.scrollTo({ x, animated: true });
+    }
+  }, [currentIndex]);
 
-  // Render a view with the current value and pressable area.
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const index = Math.round((x + H_PADDING) / SLOT);
+    const safeIndex = Math.max(0, Math.min(index, options.length - 1));
+    const selected = options[safeIndex];
+    if (selected !== value) onChange(selected);
+  };
+
   return (
-    <View style={{ marginVertical: 6 }}>
-      {/* Show the selected option label. */}
-      <Text style={{ marginBottom: 4 }}>Selected: {value}</Text>
-      {/* Pressing this toggles to the next option. */}
-      <Pressable onPress={handlePress} style={{ padding: 10, backgroundColor: '#eee' }}>
-        <Text>Tap to change</Text>
-      </Pressable>
+    <View style={styles.container}>
+      <Text style={styles.label}>Filter industry</Text>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={SLOT}
+        decelerationRate="fast"
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        contentContainerStyle={{ alignItems: 'center', paddingHorizontal: H_PADDING }}
+      >
+        {options.map((opt) => {
+          const active = opt === value;
+          return (
+            <Pressable
+              key={opt}
+              onPress={() => onChange(opt)}
+              style={[styles.option, active && styles.optionActive, { width: ITEM_WIDTH }]}
+            >
+              <Text style={[styles.optionText, active && styles.optionTextActive]} numberOfLines={1}>{opt}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { marginVertical: 6 },
+  label: { marginBottom: 6, color: '#444', fontSize: 12 },
+  option: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginHorizontal: 6,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionActive: {
+    backgroundColor: '#007bff',
+  },
+  optionText: { color: '#333' },
+  optionTextActive: { color: '#fff', fontWeight: '700' },
+});
